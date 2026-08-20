@@ -1,0 +1,42 @@
+# شرح ملفات المصدر المهمة
+
+- `app/config/settings.py`: إعدادات Pydantic من البيئة، مسارات التخزين، إعدادات تيليجرام، OCR، والتصنيف.
+- `app/config/loaders.py`: تحميل والتحقق من `channels.yaml` و`subjects.yaml` وأنواع المحتوى الثابتة.
+- `app/logging/setup.py`: تسجيل JSON أو console مع حجب الحقول الحساسة.
+- `app/cli/commands.py`: أوامر `health-check` و`init-db` و`telegram-login` و`collect` و`process` و`report`.
+- `app/telegram/client.py`: إنشاء عميل Telethon وتأمين مجلد وملف الجلسة.
+- `app/telegram/authentication.py`: تسجيل الدخول التفاعلي بالهاتف وOTP وكلمة مرور 2FA عند الحاجة.
+- `app/telegram/collector.py`: تحميل القنوات من الإعدادات، قراءة الرسائل الجديدة فقط، تحميل الملفات، حساب SHA-256، وتحديث آخر رسالة.
+- `app/telegram/floodwait.py`: انتظار FloodWait وإعادة المحاولة بعد المدة المطلوبة.
+- `app/telegram/rate_limiter.py`: تأخير محافظ بين طلبات تيليجرام.
+- `app/ingestion/message_handler.py`: تحويل رسالة Telethon إلى لقطة بيانات ثابتة قابلة للتخزين والاختبار.
+- `app/ingestion/downloader.py`: تحميل الملف إلى مسار مؤقت ثم نقله ذرّيا إلى التخزين.
+- `app/ingestion/hashing.py`: حساب SHA-256 على دفعات بدون تحميل الملف كاملا في الذاكرة.
+- `app/ingestion/deduplication.py`: فحص وجود نفس SHA-256 قبل المعالجة المكلفة.
+- `app/database/models.py`: جداول القنوات والرسائل والملفات والتصنيفات وتشغيلات المعالجة والسجلات.
+- `app/database/session.py`: إنشاء engine وsession factory وتهيئة SQLite المحلية.
+- `app/database/statuses.py`: حالات الملفات وسجلات المعالجة.
+- `app/database/repositories/channels.py`: إنشاء/تحديث القنوات وتقدم `last_message_id`.
+- `app/database/repositories/messages.py`: إدخال الرسائل بشكل idempotent.
+- `app/database/repositories/files.py`: إدخال الملفات، البحث بالهاش، وحالات الملفات الجاهزة للمعالجة.
+- `app/database/repositories/processing.py`: تسجيل مراحل المعالجة وحفظ نتيجة التصنيف.
+- `app/database/migrations/versions/0001_initial_schema.py`: Migration أولي لبناء الجداول والفهارس والقيود.
+- `app/processing/pdf_extractor.py`: استخراج النص المضمن في PDF وتحديد الحاجة إلى OCR.
+- `app/processing/ocr.py`: OCR للصور وPDF الممسوح باستخدام Tesseract ولغة `ara+eng`.
+- `app/processing/office_extractor.py`: استخراج نصوص DOCX/PPTX من ملفات Office الحديثة.
+- `app/processing/text_cleaner.py`: تنظيف محافظ للنص وقصه قبل التصنيف.
+- `app/processing/classifier.py`: واجهة التصنيف، مصنف OpenAI، ومصنف `none`، وقواعد منع التخمين.
+- `app/processing/pipeline.py`: خط معالجة الملف من الاستخراج حتى التخزين والتصنيف.
+- `app/storage/paths.py`: أسماء آمنة ومسارات تمنع path traversal.
+- `app/storage/file_storage.py`: نقل الملفات إلى `processed/<subject>/<type>` أو `unclassified` وحفظ النص المستخرج.
+- `app/reports/reporter.py`: حساب التقرير النصي للتكرار والتصنيف والفشل والتوزيع.
+- `app/runtime/locking.py`: قفل ملف يمنع تداخل التشغيلات.
+- `app/runtime/retry.py`: مساعد إعادة محاولة للعمليات العابرة.
+- `app/web/server.py`: API وسيرفر static للواجهة المحلية بدون كشف أسرار.
+- `app/web/admin.py`: خدمات إدارة القنوات والمواد وقراءة ملفات/تشغيلات قاعدة البيانات وبيانات demo.
+- `app/web/static/index.html`: هيكل واجهة الإدارة.
+- `app/web/static/app.css`: تصميم الواجهة.
+- `app/web/static/app.js`: ربط الواجهة بالـ API.
+- `scripts/telegram_login.py`: غلاف توافق يشغل أمر تسجيل الدخول من CLI.
+- `scripts/run_collection.py`: غلاف توافق يشغل أمر الجمع من CLI.
+- `tests/unit/`: اختبارات المنطق الحرج باستخدام SQLite ومزيفات Telegram/AI بدون أسرار أو اتصالات حقيقية.

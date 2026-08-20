@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+secrets/
+credentials/
+*.secret
+*.key
+*.pem
+*.session
+*.session-journal
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+local.db
+
+# Runtime data
+logs/
+*.log
+storage/incoming/*
+storage/processed/*
+storage/unclassified/*
+storage/texts/*
+!storage/incoming/.gitkeep
+!storage/processed/.gitkeep
+!storage/unclassified/.gitkeep
+
+# Temporary files
+tmp/
+*.tmp
+.DS_Store

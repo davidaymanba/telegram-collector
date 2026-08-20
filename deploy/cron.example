@@ -1,0 +1,9 @@
+# Edit PROJECT_DIR and VENV_DIR for the VPS.
+# flock prevents overlapping runs even if a previous job is still active.
+
+PROJECT_DIR=/opt/telegram-university-collector
+VENV_DIR=/opt/telegram-university-collector/.venv
+
+*/10 * * * * cd $PROJECT_DIR && flock -n storage/collector.cron.lock $VENV_DIR/bin/python -m app.cli collect >> logs/cron.log 2>&1
+*/10 * * * * cd $PROJECT_DIR && flock -n storage/processor.cron.lock $VENV_DIR/bin/python -m app.cli process >> logs/cron.log 2>&1
+

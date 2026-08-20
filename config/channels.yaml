@@ -1,0 +1,10 @@
+channels:
+- name: networks
+  username: '@networks_channel'
+  enabled: true
+- name: networkstest
+  username: '@networks_channel'
+  enabled: true
+- name: test
+  username: '@test_channel'
+  enabled: true

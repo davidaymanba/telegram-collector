@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telegram-university-collector"
+version = "0.1.0"
+description = "Telegram university content collector and classification system"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.13",
+    "openai>=1.40",
+    "pillow>=10.4",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "pymysql>=1.1",
+    "pymupdf>=1.24",
+    "pytesseract>=0.3.10",
+    "pyyaml>=6.0",
+    "sqlalchemy>=2.0",
+    "telethon>=1.36",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-mock>=3.14",
+    "ruff>=0.5",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+"app.web" = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

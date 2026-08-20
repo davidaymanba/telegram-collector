@@ -1,0 +1,20 @@
+[Unit]
+Description=Telegram University Collector file processing command
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/telegram-university-collector
+EnvironmentFile=/opt/telegram-university-collector/.env
+ExecStart=/opt/telegram-university-collector/.venv/bin/python -m app.cli process
+User=collector
+Group=collector
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/telegram-university-collector/storage /opt/telegram-university-collector/logs /opt/telegram-university-collector/secrets
+
+[Install]
+WantedBy=multi-user.target
+

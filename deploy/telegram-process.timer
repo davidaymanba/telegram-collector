@@ -1,0 +1,11 @@
+[Unit]
+Description=Process downloaded Telegram University Collector files every 10 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=10min
+Unit=telegram-process.service
+
+[Install]
+WantedBy=timers.target
+

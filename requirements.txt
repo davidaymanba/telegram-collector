@@ -1,0 +1,11 @@
+alembic>=1.13
+openai>=1.40
+pillow>=10.4
+pydantic>=2.8
+pydantic-settings>=2.4
+pymysql>=1.1
+pymupdf>=1.24
+pytesseract>=0.3.10
+pyyaml>=6.0
+sqlalchemy>=2.0
+telethon>=1.36
