@@ -36,11 +36,14 @@ class FakeTelegramMessage:
 class FakeTelegramClient:
     def __init__(self, messages: list[FakeTelegramMessage]) -> None:
         self.messages = messages
-        self.started = False
+        self.connected = False
         self.disconnected = False
 
-    async def start(self) -> None:
-        self.started = True
+    async def connect(self) -> None:
+        self.connected = True
+
+    async def is_user_authorized(self) -> bool:
+        return True
 
     async def disconnect(self) -> None:
         self.disconnected = True
@@ -96,3 +99,19 @@ def test_collector_downloads_hashes_deduplicates_and_advances_state(
             FileStatus.DUPLICATE.value,
         ]
 
+
+def test_collector_accepts_configured_channel_username(
+    test_settings,
+    db_session_factory,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("app.telegram.collector.utils.get_peer_id", lambda entity: 123)
+    collector = TelegramCollector(
+        settings=test_settings,
+        session_factory=db_session_factory,
+        telegram_client=FakeTelegramClient([]),
+    )
+
+    summary = asyncio.run(collector.collect(channel_name="@database_channel"))
+
+    assert summary.new_messages == 0

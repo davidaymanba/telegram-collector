@@ -526,7 +526,7 @@ def list_messages(session: Session, *, limit: int = 100) -> list[dict[str, Any]]
     statement = (
         select(Message)
         .options(joinedload(Message.channel), joinedload(Message.file))
-        .order_by(Message.id.desc())
+        .order_by(Message.message_date.desc(), Message.id.desc())
         .limit(limit)
     )
     return [_message_to_dict(message) for message in session.scalars(statement).unique().all()]

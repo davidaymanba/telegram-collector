@@ -3,6 +3,7 @@ const state = {
   files: [],
   messages: [],
   runs: [],
+  lastCollectSummary: null,
 };
 
 const els = {
@@ -12,6 +13,10 @@ const els = {
   subjectBars: document.querySelector("#subjectBars"),
   typeBars: document.querySelector("#typeBars"),
   recentFilesBody: document.querySelector("#recentFilesBody"),
+  livePullState: document.querySelector("#livePullState"),
+  livePullSummary: document.querySelector("#livePullSummary"),
+  liveMessagesBody: document.querySelector("#liveMessagesBody"),
+  liveFilesBody: document.querySelector("#liveFilesBody"),
   channelsBody: document.querySelector("#channelsBody"),
   subjectsBody: document.querySelector("#subjectsBody"),
   filesBody: document.querySelector("#filesBody"),
@@ -19,6 +24,7 @@ const els = {
   runsBody: document.querySelector("#runsBody"),
   runtimeList: document.querySelector("#runtimeList"),
   collectChannel: document.querySelector("#collectChannel"),
+  liveCollectChannel: document.querySelector("#liveCollectChannel"),
   stateChannel: document.querySelector("#stateChannel"),
   messageChannel: document.querySelector("#messageChannel"),
   fileStatus: document.querySelector("#fileStatus"),
@@ -30,9 +36,12 @@ const els = {
   channelStateForm: document.querySelector("#channelStateForm"),
   subjectForm: document.querySelector("#subjectForm"),
   collectForm: document.querySelector("#collectForm"),
+  liveCollectForm: document.querySelector("#liveCollectForm"),
   refreshBtn: document.querySelector("#refreshBtn"),
   seedBtn: document.querySelector("#seedBtn"),
   processBtn: document.querySelector("#processBtn"),
+  liveCollectBtn: document.querySelector("#liveCollectBtn"),
+  liveRefreshBtn: document.querySelector("#liveRefreshBtn"),
   reloadFilesBtn: document.querySelector("#reloadFilesBtn"),
   reloadMessagesBtn: document.querySelector("#reloadMessagesBtn"),
   reloadRunsBtn: document.querySelector("#reloadRunsBtn"),
@@ -58,6 +67,16 @@ function bytes(value) {
 
 function shortHash(value) {
   return value ? `${value.slice(0, 10)}...` : "-";
+}
+
+function formatTelegramDate(value) {
+  if (!value) return "-";
+  const parsed = new Date(`${value}Z`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function showNotice(message, type = "info") {
@@ -168,6 +187,11 @@ function renderOptions(data) {
     "Choose channel",
   );
   fillSelect(
+    els.liveCollectChannel,
+    (data.channels || []).filter((channel) => channel.enabled).map((channel) => channel.name),
+    "Choose channel",
+  );
+  fillSelect(
     els.stateChannel,
     (data.channels || []).map((channel) => channel.name),
     "Choose channel",
@@ -209,6 +233,69 @@ function renderFiles(target, files, compact = false) {
       </tr>
     `)
     .join("");
+}
+
+function collectSummaryFromRun(run) {
+  if (!run) return null;
+  return {
+    new_messages: run.new_count || 0,
+    downloaded_files: "-",
+    duplicate_files: run.duplicate_count || 0,
+    unsupported_files: run.unsupported_count || 0,
+    skipped_messages: "-",
+    failed_messages: run.failed_count || 0,
+  };
+}
+
+function renderLiveMessages(messages) {
+  if (!messages.length) {
+    els.liveMessagesBody.innerHTML = emptyRow(7);
+    return;
+  }
+  els.liveMessagesBody.innerHTML = messages
+    .map((message) => `
+      <tr>
+        <td>${escapeHtml(message.id)}</td>
+        <td>${escapeHtml(message.telegram_message_id)}</td>
+        <td>${escapeHtml(message.channel)}</td>
+        <td class="wrap content-preview">${escapeHtml(message.caption || "-")}</td>
+        <td class="wrap">
+          <strong>${escapeHtml(message.media_type || "text")}</strong>
+          <div class="muted">${escapeHtml(message.file_name || "-")}</div>
+        </td>
+        <td class="wrap">${escapeHtml(formatTelegramDate(message.message_date))}</td>
+        <td class="wrap">${escapeHtml(message.created_at || "-")}</td>
+      </tr>
+    `)
+    .join("");
+}
+
+function renderLivePull(data) {
+  const runs = state.runs.length ? state.runs : data.recent_runs || [];
+  const messages = state.messages.length ? state.messages : data.recent_messages || [];
+  const files = state.files.length ? state.files : data.recent_files || [];
+  const latestCollectRun = runs.find((run) => run.metadata?.command === "collect");
+  const summary = state.lastCollectSummary || collectSummaryFromRun(latestCollectRun);
+
+  if (latestCollectRun) {
+    els.livePullState.textContent = `Last pull #${latestCollectRun.id}`;
+    els.livePullState.className = "badge good";
+  } else {
+    els.livePullState.textContent = "Ready";
+    els.livePullState.className = "badge neutral";
+  }
+
+  els.livePullSummary.innerHTML = [
+    metric("رسائل جديدة", summary?.new_messages ?? 0, "teal"),
+    metric("ملفات محملة", summary?.downloaded_files ?? 0, "blue"),
+    metric("مكرر", summary?.duplicate_files ?? 0, "amber"),
+    metric("غير مدعوم", summary?.unsupported_files ?? 0, "violet"),
+    metric("متجاهل", summary?.skipped_messages ?? 0, "blue"),
+    metric("فشل", summary?.failed_messages ?? 0, "red"),
+  ].join("");
+
+  renderLiveMessages(messages);
+  renderFiles(els.liveFilesBody, files, true);
 }
 
 function renderChannels(channels) {
@@ -267,7 +354,7 @@ function renderMessages(messages) {
               <div class="muted">${escapeHtml(bytes(message.file_size))}</div>
             </td>
             <td class="wrap">${escapeHtml(message.caption || "-")}</td>
-            <td class="wrap">${escapeHtml(message.message_date || "-")}</td>
+            <td class="wrap">${escapeHtml(formatTelegramDate(message.message_date))}</td>
             <td>
               <div class="action-cell">
                 <button class="button secondary small" data-edit-message="${escapeHtml(message.id)}">Edit</button>
@@ -327,6 +414,7 @@ function renderOverview(data) {
   renderBars(els.subjectBars, data.report.by_subject);
   renderBars(els.typeBars, data.report.by_content_type);
   renderFiles(els.recentFilesBody, data.recent_files, true);
+  renderLivePull(data);
   renderFiles(els.filesBody, state.files.length ? state.files : data.recent_files);
   renderChannels(data.channels);
   renderSubjects(data.subjects);
@@ -413,6 +501,21 @@ async function runButtonAction(button, callback) {
   }
 }
 
+async function collectFromForm(formElement) {
+  const form = new FormData(formElement);
+  const payload = {
+    channel: form.get("channel"),
+    limit: Number(form.get("limit") || 5),
+  };
+  const result = await api("/api/actions/collect", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  state.lastCollectSummary = result.summary || null;
+  await refreshAfterMutation({ files: true, messages: true, runs: true });
+  showNotice("تم سحب البيانات من تيليجرام");
+}
+
 document.querySelectorAll(".tab").forEach((button) => {
   button.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach((tab) => tab.classList.remove("active"));
@@ -463,6 +566,13 @@ els.reloadRunsBtn.addEventListener("click", (event) => {
   runButtonAction(event.currentTarget, async () => {
     await reloadRuns();
     showNotice("تم تحديث التشغيلات");
+  });
+});
+
+els.liveRefreshBtn.addEventListener("click", (event) => {
+  runButtonAction(event.currentTarget, async () => {
+    await refreshAfterMutation({ files: true, messages: true, runs: true });
+    showNotice("تم تحديث بيانات السحب");
   });
 });
 
@@ -586,20 +696,16 @@ els.messageForm.addEventListener("submit", async (event) => {
 
 els.collectForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  try {
-    await api("/api/actions/collect", {
-      method: "POST",
-      body: JSON.stringify({
-        channel: form.get("channel"),
-        limit: Number(form.get("limit") || 5),
-      }),
-    });
-    await refreshAfterMutation({ files: true, messages: true, runs: true });
-    showNotice("تم تشغيل الجمع");
-  } catch (error) {
-    showNotice(error.message, "error");
-  }
+  runButtonAction(event.currentTarget.querySelector("button[type='submit']"), async () => {
+    await collectFromForm(event.currentTarget);
+  });
+});
+
+els.liveCollectForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  runButtonAction(els.liveCollectBtn, async () => {
+    await collectFromForm(event.currentTarget);
+  });
 });
 
 document.addEventListener("click", async (event) => {

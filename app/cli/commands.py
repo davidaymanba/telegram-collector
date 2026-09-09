@@ -18,7 +18,7 @@ from app.processing.pipeline import ProcessingPipeline
 from app.reports.reporter import Reporter
 from app.runtime.locking import LockAlreadyHeldError, file_lock
 from app.telegram.authentication import interactive_login
-from app.telegram.collector import TelegramCollector
+from app.telegram.collector import TelegramCollector, TelegramSessionNotAuthorizedError
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +188,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             print(str(exc), file=sys.stderr)
             return 75
+        except TelegramSessionNotAuthorizedError as exc:
+            logger.error("Telegram session is not authorized")
+            print(str(exc), file=sys.stderr)
+            return 1
     if args.command == "process":
         try:
             return asyncio.run(run_process(settings, limit=args.limit))

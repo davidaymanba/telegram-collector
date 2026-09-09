@@ -36,6 +36,10 @@ class CollectionSummary:
     failed_messages: int = 0
 
 
+class TelegramSessionNotAuthorizedError(Exception):
+    pass
+
+
 class TelegramCollector:
     """Collect new messages and files from configured Telegram channels."""
 
@@ -60,16 +64,25 @@ class TelegramCollector:
         channels_config = load_channels_config(self.settings.channels_config_path)
         enabled_channels = channels_config.enabled_channels
         if channel_name is not None:
+            requested_channel = channel_name.strip().lower()
             enabled_channels = [
                 channel for channel in enabled_channels if channel.name == channel_name
+                or channel.username.lower() == requested_channel
             ]
+            if not enabled_channels:
+                raise ValueError(f"Enabled channel is not configured: {channel_name}")
 
         summary = CollectionSummary()
         client = self.telegram_client or build_telegram_client(self.settings)
         should_disconnect = self.telegram_client is None
 
         if should_disconnect:
-            await client.start()
+            await client.connect()
+            if not await client.is_user_authorized():
+                raise TelegramSessionNotAuthorizedError(
+                    "Telegram session is not authorized. Run `python -m app.cli telegram-login` "
+                    "first to create an authorized session."
+                )
 
         try:
             for channel_config in enabled_channels:
@@ -99,7 +112,7 @@ class TelegramCollector:
                 async for message in client.iter_messages(
                     entity,
                     min_id=last_message_id,
-                    reverse=True,
+                    reverse=False,
                     limit=limit,
                 ):
                     await self.rate_limiter.wait()

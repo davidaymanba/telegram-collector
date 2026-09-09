@@ -11,10 +11,12 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 from app.config.settings import Settings
+from app.database.models import ProcessingRun
+from app.database.repositories.processing import ProcessingRunRepository
 from app.database.session import create_database_engine, create_session_factory, init_db
 from app.processing.pipeline import ProcessingPipeline
 from app.runtime.locking import LockAlreadyHeldError, file_lock
-from app.telegram.collector import TelegramCollector
+from app.telegram.collector import TelegramCollector, TelegramSessionNotAuthorizedError
 from app.web.admin import (
     build_overview,
     create_manual_file,
@@ -237,11 +239,45 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 HTTPStatus.PRECONDITION_REQUIRED,
             )
         with file_lock(self.settings.lock_file_path):
+            session_factory = _session_factory(self.settings)
+            with session_factory() as session:
+                run = ProcessingRunRepository(session).start(
+                    {
+                        "command": "collect",
+                        "channel": channel,
+                        "limit": limit,
+                        "source": "dashboard",
+                    }
+                )
+                run_id = run.id
+                session.commit()
+
             collector = TelegramCollector(
                 settings=self.settings,
-                session_factory=_session_factory(self.settings),
+                session_factory=session_factory,
             )
-            return await collector.collect(channel_name=channel, limit=limit)
+            try:
+                summary = await collector.collect(channel_name=channel, limit=limit)
+            except Exception:
+                with session_factory() as session:
+                    run = session.get(ProcessingRun, run_id)
+                    if run is not None:
+                        ProcessingRunRepository(session).finish(run, failed_count=1)
+                        session.commit()
+                raise
+
+            with session_factory() as session:
+                run = session.get(ProcessingRun, run_id)
+                if run is not None:
+                    ProcessingRunRepository(session).finish(
+                        run,
+                        new_count=summary.new_messages,
+                        duplicate_count=summary.duplicate_files,
+                        failed_count=summary.failed_messages,
+                        unsupported_count=summary.unsupported_files,
+                    )
+                    session.commit()
+            return summary
 
     def _overview(self) -> dict[str, Any]:
         with _session_factory(self.settings)() as session:
@@ -291,6 +327,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
         if isinstance(exc, ApiError):
             self._send_json({"error": str(exc)}, status=exc.status)
+            return
+        if isinstance(exc, TelegramSessionNotAuthorizedError):
+            self._send_json({"error": str(exc)}, status=HTTPStatus.PRECONDITION_REQUIRED)
             return
         self._send_json({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 

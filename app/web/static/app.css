@@ -368,6 +368,11 @@ td.wrap {
   min-width: 240px;
 }
 
+.content-preview {
+  max-width: 520px;
+  overflow-wrap: anywhere;
+}
+
 tr:last-child td {
   border-bottom: 0;
 }
