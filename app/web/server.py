@@ -16,6 +16,7 @@ from app.database.repositories.processing import ProcessingRunRepository
 from app.database.session import create_database_engine, create_session_factory, init_db
 from app.processing.pipeline import ProcessingPipeline
 from app.runtime.locking import LockAlreadyHeldError, file_lock
+from app.telegram.authentication import TelegramLoginError, web_login_start, web_login_verify
 from app.telegram.collector import TelegramCollector, TelegramSessionNotAuthorizedError
 from app.web.admin import (
     build_overview,
@@ -66,6 +67,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 return
             if parsed.path == "/api/health":
                 self._send_json({"healthy": True, "database": self._database_label()})
+                return
+            if parsed.path == "/api/telegram/status":
+                self._send_json(asyncio.run(self._telegram_status()))
                 return
             if parsed.path == "/api/overview":
                 self._send_json(self._overview())
@@ -137,6 +141,22 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/demo/seed":
                 with _session_factory(self.settings)() as session:
                     self._send_json(seed_demo_data(self.settings, session))
+                return
+            if parsed.path == "/api/telegram/login/start":
+                payload = self._read_json()
+                self._send_json(asyncio.run(web_login_start(self.settings, payload.get("phone", ""))))
+                return
+            if parsed.path == "/api/telegram/login/verify":
+                payload = self._read_json()
+                self._send_json(
+                    asyncio.run(
+                        web_login_verify(
+                            self.settings,
+                            payload.get("code", ""),
+                            payload.get("password"),
+                        )
+                    )
+                )
                 return
             if parsed.path == "/api/actions/process":
                 payload = self._read_json(optional=True)
@@ -230,6 +250,18 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 session_factory=_session_factory(self.settings),
             )
             return await pipeline.process_pending(limit=limit)
+
+    async def _telegram_status(self) -> dict[str, Any]:
+        if self.settings.telegram_api_id is None or self.settings.telegram_api_hash is None:
+            return {"configured": False, "authorized": False}
+        from app.telegram.client import build_telegram_client
+
+        client = build_telegram_client(self.settings)
+        await client.connect()
+        try:
+            return {"configured": True, "authorized": await client.is_user_authorized()}
+        finally:
+            await client.disconnect()
 
     async def _run_collect(self, channel: str | None, limit: int | None):
         if self.settings.telegram_api_id is None or self.settings.telegram_api_hash is None:
@@ -330,6 +362,9 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             return
         if isinstance(exc, TelegramSessionNotAuthorizedError):
             self._send_json({"error": str(exc)}, status=HTTPStatus.PRECONDITION_REQUIRED)
+            return
+        if isinstance(exc, TelegramLoginError):
+            self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
             return
         self._send_json({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 

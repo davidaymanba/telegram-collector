@@ -436,6 +436,30 @@
                 <button class="button primary" type="submit">Collect From Telegram</button>
               </form>
             </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Telegram Login</h2>
+                <span id="telegramLoginState" class="badge neutral">Checking</span>
+              </div>
+              <form id="telegramLoginStartForm" class="stack-form">
+                <label>
+                  Phone number
+                  <input name="phone" type="tel" placeholder="+201000000000" required>
+                </label>
+                <button class="button primary" type="submit">Send Telegram Code</button>
+              </form>
+              <form id="telegramLoginVerifyForm" class="stack-form hidden">
+                <label>
+                  Telegram code
+                  <input name="code" inputmode="numeric" autocomplete="one-time-code" required>
+                </label>
+                <label>
+                  2FA password (if enabled)
+                  <input name="password" type="password" autocomplete="current-password">
+                </label>
+                <button class="button primary" type="submit">Complete Login</button>
+              </form>
+            </section>
           </div>
         </section>
       </main>

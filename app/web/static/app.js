@@ -47,6 +47,9 @@ const els = {
   reloadRunsBtn: document.querySelector("#reloadRunsBtn"),
   clearFileFormBtn: document.querySelector("#clearFileFormBtn"),
   clearMessageFormBtn: document.querySelector("#clearMessageFormBtn"),
+  telegramLoginState: document.querySelector("#telegramLoginState"),
+  telegramLoginStartForm: document.querySelector("#telegramLoginStartForm"),
+  telegramLoginVerifyForm: document.querySelector("#telegramLoginVerifyForm"),
 };
 
 function escapeHtml(value) {
@@ -431,6 +434,13 @@ async function refreshAll() {
   renderOverview(data);
 }
 
+async function refreshTelegramStatus() {
+  const status = await api("/api/telegram/status");
+  els.telegramLoginState.textContent = status.authorized ? "Authorized" : "Not logged in";
+  els.telegramLoginState.className = `badge ${status.authorized ? "good" : "neutral"}`;
+  if (status.authorized) els.telegramLoginVerifyForm.classList.add("hidden");
+}
+
 async function reloadFiles() {
   const payload = await api("/api/files?limit=100");
   state.files = payload.files;
@@ -578,6 +588,47 @@ els.liveRefreshBtn.addEventListener("click", (event) => {
 
 els.clearFileFormBtn.addEventListener("click", clearFileForm);
 els.clearMessageFormBtn.addEventListener("click", clearMessageForm);
+
+els.telegramLoginStartForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  try {
+    const result = await api("/api/telegram/login/start", {
+      method: "POST",
+      body: JSON.stringify({ phone: form.get("phone") }),
+    });
+    if (result.status === "authorized") {
+      showNotice("Telegram session is already authorized");
+    } else {
+      els.telegramLoginVerifyForm.classList.remove("hidden");
+      showNotice("تم إرسال كود Telegram");
+    }
+    await refreshTelegramStatus();
+  } catch (error) {
+    showNotice(error.message, "error");
+  }
+});
+
+els.telegramLoginVerifyForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  try {
+    const result = await api("/api/telegram/login/verify", {
+      method: "POST",
+      body: JSON.stringify({ code: form.get("code"), password: form.get("password") }),
+    });
+    if (result.status === "password_required") {
+      showNotice("اكتب كلمة مرور Telegram ذات التحقق بخطوتين");
+      return;
+    }
+    event.currentTarget.reset();
+    event.currentTarget.classList.add("hidden");
+    await refreshTelegramStatus();
+    showNotice("تم تسجيل الدخول إلى Telegram");
+  } catch (error) {
+    showNotice(error.message, "error");
+  }
+});
 
 els.channelForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -855,3 +906,4 @@ refreshAll().catch((error) => {
   els.healthBadge.className = "badge bad";
   showNotice(error.message, "error");
 });
+refreshTelegramStatus().catch((error) => showNotice(error.message, "error"));
